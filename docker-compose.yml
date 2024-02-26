@@ -1,0 +1,73 @@
+version: '3.9'
+
+networks:
+  order_app:
+
+services:
+  order_site:
+    build:
+      context: ./dockerfiles
+      dockerfile: nginx.dockerfile
+    container_name: order_nginx
+    ports:
+      - "8081:80"
+    volumes:
+      - ./src:/var/www/html:delegated
+    depends_on:
+      - order_php
+      - order_maindb
+    networks:
+      - order_app
+
+  order_php:
+    build:
+      context: ./dockerfiles
+      dockerfile: php.dockerfile
+    container_name: order_php
+    ports:
+      - "9001:9000"
+    volumes:
+      - ./src:/var/www/html:delegated
+    networks:
+      - order_app
+
+  order_composer:
+      image: composer:latest
+      container_name: order_composer
+      volumes:
+        - ./src:/var/www/html
+      working_dir: /var/www/html
+      depends_on:
+        - order_php
+      user: root
+      entrypoint: [ 'composer', '--ignore-platform-reqs' ]
+      networks:
+        - order_app
+
+  order_artisan:
+      build:
+        context: ./dockerfiles
+        dockerfile: php.dockerfile
+      container_name: order_artisan
+      volumes:
+        - ./src:/var/www/html:delegated
+      depends_on:
+        - order_maindb
+      working_dir: /var/www/html
+      entrypoint: [ 'php', '/var/www/html/artisan' ]
+      networks:
+        - order_app
+
+  order_maindb:
+      image: postgres
+      restart: always
+      ports:
+        - "5434:5432"
+      environment:
+        POSTGRES_DB: order_service
+        POSTGRES_USER: jonecoder
+        POSTGRES_PASSWORD: password
+      volumes:
+        - ./data/postgresql:/var/lib/postgresql/data
+      networks:
+        - order_app
